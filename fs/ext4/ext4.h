@@ -2202,6 +2202,10 @@ static inline struct ext4_crypt_info *ext4_encryption_info(struct inode *inode)
 {
 	return NULL;
 }
+static inline int ext4_using_hardware_encryption(struct inode *inode)
+{
+	return 0;
+}
 #endif
 
 
