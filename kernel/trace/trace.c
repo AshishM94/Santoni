@@ -1325,8 +1325,8 @@ static int allocate_cmdlines_buffer(unsigned int val,
 	}
 
 	s->map_cmdline_to_tgid = kmalloc_array(val,
-			sizeof(*s->map_cmdline_to_tgid),
-			GFP_KERNEL);
+					       sizeof(*s->map_cmdline_to_tgid),
+					       GFP_KERNEL);
 	if (!s->map_cmdline_to_tgid) {
 		kfree(s->map_cmdline_to_pid);
 		kfree(s->saved_cmdlines);
@@ -1340,7 +1340,7 @@ static int allocate_cmdlines_buffer(unsigned int val,
 	memset(s->map_cmdline_to_pid, NO_CMDLINE_MAP,
 	       val * sizeof(*s->map_cmdline_to_pid));
 	memset(s->map_cmdline_to_tgid, NO_CMDLINE_MAP,
-			val * sizeof(*s->map_cmdline_to_tgid));
+	       val * sizeof(*s->map_cmdline_to_tgid));
 
 	return 0;
 }

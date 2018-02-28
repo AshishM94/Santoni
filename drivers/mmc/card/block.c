@@ -3133,15 +3133,23 @@ static void mmc_blk_cmdq_err(struct mmc_queue *mq)
 	/* RED error - Fatal: requires reset */
 	if (mrq->cmdq_req->resp_err) {
 		err = mrq->cmdq_req->resp_err;
+		goto reset;
+	}
+
+	/*
+	 * TIMEOUT errrors can happen because of execution error
+	 * in the last command. So send cmd 13 to get device status
+	 */
+	if ((mrq->cmd && (mrq->cmd->error == -ETIMEDOUT)) ||
+			(mrq->data && (mrq->data->error == -ETIMEDOUT))) {
 		if (mmc_host_halt(host) || mmc_host_cq_disable(host)) {
 			ret = get_card_status(host->card, &status, 0);
 			if (ret)
 				pr_err("%s: CMD13 failed with err %d\n",
 						mmc_hostname(host), ret);
 		}
-		pr_err("%s: Response error detected with device status 0x%08x\n",
+		pr_err("%s: Timeout error detected with device status 0x%08x\n",
 			mmc_hostname(host), status);
-		goto reset;
 	}
 
 	/*
@@ -3466,7 +3474,7 @@ static inline int mmc_blk_cmdq_part_switch(struct mmc_card *card,
 		ret = mmc_cmdq_halt(host, true);
 		if (ret) {
 			pr_err("%s: %s: halt: failed: %d\n",
-					mmc_hostname(host), __func__,  ret);
+				mmc_hostname(host), __func__,  ret);
 			goto out;
 		}
 	}
@@ -3478,7 +3486,7 @@ static inline int mmc_blk_cmdq_part_switch(struct mmc_card *card,
 				 card->ext_csd.generic_cmd6_time);
 		if (ret) {
 			pr_err("%s: %s: cmdq mode disable failed %d\n",
-					mmc_hostname(host), __func__, ret);
+				mmc_hostname(host), __func__, ret);
 			goto cmdq_unhalt;
 		}
 		mmc_card_clr_cmdq(card);
@@ -3492,8 +3500,8 @@ static inline int mmc_blk_cmdq_part_switch(struct mmc_card *card,
 			 card->ext_csd.part_time);
 	if (ret) {
 		pr_err("%s: %s: mmc_switch failure, %d -> %d , err = %d\n",
-				mmc_hostname(host), __func__, main_md->part_curr,
-				md->part_type, ret);
+			mmc_hostname(host), __func__, main_md->part_curr,
+			md->part_type, ret);
 		goto cmdq_switch;
 	}
 
@@ -3506,14 +3514,14 @@ cmdq_switch:
 	err = mmc_blk_cmdq_switch(card, md, true);
 	if (err) {
 		pr_err("%s: %s: mmc_blk_cmdq_switch failed: %d\n",
-				mmc_hostname(host), __func__,  err);
+			mmc_hostname(host), __func__,  err);
 		ret = err;
 	}
 cmdq_unhalt:
 	err = mmc_cmdq_halt(host, false);
 	if (err) {
 		pr_err("%s: %s: unhalt: failed: %d\n",
-				mmc_hostname(host), __func__,  err);
+			mmc_hostname(host), __func__,  err);
 		ret = err;
 	}
 out:
@@ -3554,11 +3562,11 @@ static int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 		err = mmc_blk_cmdq_part_switch(card, md);
 		if (!err) {
 			pr_err("%s: %s: partition switch success err = %d\n",
-					md->disk->disk_name, __func__, err);
+				md->disk->disk_name, __func__, err);
 		} else {
 			pr_err("%s: %s: partition switch failed err = %d\n",
-					md->disk->disk_name, __func__, err);
-			ret = 0;
+				md->disk->disk_name, __func__, err);
+			ret = err;
 			goto out;
 		}
 	}

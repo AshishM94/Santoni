@@ -455,8 +455,8 @@ static long audio_cal_shared_ioctl(struct file *file, unsigned int cmd,
 		goto done;
 	} else if ((data->hdr.cal_type_size + sizeof(data->hdr)) > size) {
 		pr_err("%s: cal type hdr size %zd + cal type size %d is greater than user buffer size %d\n",
-				__func__, sizeof(data->hdr), data->hdr.cal_type_size,
-				size);
+			__func__, sizeof(data->hdr), data->hdr.cal_type_size,
+			size);
 		ret = -EFAULT;
 		goto done;
 	}

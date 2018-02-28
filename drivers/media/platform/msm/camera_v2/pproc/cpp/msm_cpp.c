@@ -2326,30 +2326,30 @@ static int msm_cpp_cfg_frame(struct cpp_device *cpp_dev,
 		return -EINVAL;
 	}
 
-
+	/* Stripe index starts at zero */
 	if ((!new_frame->num_strips) ||
-			(new_frame->first_stripe_index >= new_frame->num_strips) ||
-			(new_frame->last_stripe_index  >= new_frame->num_strips) ||
-			(new_frame->first_stripe_index >
+		(new_frame->first_stripe_index >= new_frame->num_strips) ||
+		(new_frame->last_stripe_index  >= new_frame->num_strips) ||
+		(new_frame->first_stripe_index >
 			new_frame->last_stripe_index)) {
 		pr_err("Invalid frame message, #stripes=%d, stripe indices=[%d,%d]\n",
-				new_frame->num_strips,
-				new_frame->first_stripe_index,
-				new_frame->last_stripe_index);
+			new_frame->num_strips,
+			new_frame->first_stripe_index,
+			new_frame->last_stripe_index);
 		return -EINVAL;
 	}
 
 	if (!stripe_size) {
 		pr_err("Invalid frame message, invalid stripe_size (%d)!\n",
-				stripe_size);
+			stripe_size);
 		return -EINVAL;
 	}
 
 	if ((stripe_base == UINT_MAX) ||
-			(new_frame->num_strips >
-				(UINT_MAX - 1 - stripe_base) / stripe_size)) {
+		(new_frame->num_strips >
+			(UINT_MAX - 1 - stripe_base) / stripe_size)) {
 		pr_err("Invalid frame message, num_strips %d is large\n",
-				new_frame->num_strips);
+			new_frame->num_strips);
 		return -EINVAL;
 	}
 
@@ -2740,13 +2740,15 @@ end:
 	return rc;
 }
 
-static int msm_cpp_validate_input(unsigned int cmd, void *arg,
+static int msm_cpp_validate_ioctl_input(unsigned int cmd, void *arg,
 	struct msm_camera_v4l2_ioctl_t **ioctl_ptr)
 {
 	switch (cmd) {
 	case MSM_SD_SHUTDOWN:
 	case MSM_SD_NOTIFY_FREEZE:
 	case MSM_SD_UNNOTIFY_FREEZE:
+	case VIDIOC_MSM_CPP_IOMMU_ATTACH:
+	case VIDIOC_MSM_CPP_IOMMU_DETACH:
 		break;
 	default: {
 		if (ioctl_ptr == NULL) {
@@ -2755,8 +2757,9 @@ static int msm_cpp_validate_input(unsigned int cmd, void *arg,
 		}
 
 		*ioctl_ptr = arg;
-		if ((*ioctl_ptr == NULL) ||
-			(*ioctl_ptr)->ioctl_ptr == NULL) {
+		if (((*ioctl_ptr) == NULL) ||
+			((*ioctl_ptr)->ioctl_ptr == NULL) ||
+			((*ioctl_ptr)->len == 0)) {
 			pr_err("Error invalid ioctl argument cmd %u", cmd);
 			return -EINVAL;
 		}
@@ -2788,7 +2791,7 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		return -EINVAL;
 	}
 
-	rc = msm_cpp_validate_input(cmd, arg, &ioctl_ptr);
+	rc = msm_cpp_validate_ioctl_input(cmd, arg, &ioctl_ptr);
 	if (rc != 0) {
 		pr_err("input validation failed\n");
 		return rc;
@@ -3281,7 +3284,7 @@ STREAM_BUFF_END:
 			(cpp_dev->stream_cnt == 0)) {
 			rc = cam_smmu_ops(cpp_dev->iommu_hdl, CAM_SMMU_DETACH);
 			if (rc < 0) {
-				pr_err("%s:%dError iommu atach failed\n",
+				pr_err("%s:%dError iommu detach failed\n",
 					__func__, __LINE__);
 				rc = -EINVAL;
 				break;
@@ -3290,6 +3293,7 @@ STREAM_BUFF_END:
 		} else {
 			pr_err("%s:%d IOMMMU attach triggered in invalid state\n",
 				__func__, __LINE__);
+			rc = -EINVAL;
 		}
 		break;
 	}
@@ -3922,7 +3926,8 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	default:
 		pr_err_ratelimited("%s: unsupported compat type :%x LOAD %lu\n",
 				__func__, cmd, VIDIOC_MSM_CPP_LOAD_FIRMWARE);
-		break;
+		mutex_unlock(&cpp_dev->mutex);
+		return -EINVAL;
 	}
 
 	mutex_unlock(&cpp_dev->mutex);
@@ -3953,7 +3958,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	default:
 		pr_err_ratelimited("%s: unsupported compat type :%d\n",
 				__func__, cmd);
-		break;
+		return -EINVAL;
 	}
 
 	if (is_copytouser_req) {

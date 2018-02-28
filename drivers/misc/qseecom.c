@@ -2891,7 +2891,7 @@ static int qseecom_send_service_cmd(struct qseecom_dev_handle *data,
 		if (req.cmd_id == QSEOS_RPMB_CHECK_PROV_STATUS_COMMAND) {
 			pr_warn("RPMB key status is 0x%x\n", resp.result);
 			if (put_user(resp.result,
-					(uint32_t __user *)req.resp_buf)) {
+				(uint32_t __user *)req.resp_buf)) {
 				ret = -EINVAL;
 				goto exit;
 			}
@@ -4354,9 +4354,9 @@ int qseecom_start_app(struct qseecom_handle **handle,
 		return -EINVAL;
 	}
 
-	if (strlen(app_name) >= MAX_APP_NAME_SIZE) {
+	if (strnlen(app_name, MAX_APP_NAME_SIZE) == MAX_APP_NAME_SIZE) {
 		pr_err("The app_name (%s) with length %zu is not valid\n",
-			app_name, strlen(app_name));
+			app_name, strnlen(app_name, MAX_APP_NAME_SIZE));
 		return -EINVAL;
 	}
 
@@ -6448,6 +6448,9 @@ static int __qseecom_qteec_issue_cmd(struct qseecom_dev_handle *data,
 	req_ptr = req->req_ptr;
 	resp_ptr = req->resp_ptr;
 
+	req_ptr = req->req_ptr;
+	resp_ptr = req->resp_ptr;
+
 	/* find app_id & img_name from list */
 	spin_lock_irqsave(&qseecom.registered_app_list_lock, flags);
 	list_for_each_entry(ptr_app, &qseecom.registered_app_list_head,
@@ -6466,9 +6469,9 @@ static int __qseecom_qteec_issue_cmd(struct qseecom_dev_handle *data,
 	}
 
 	req->req_ptr = (void *)__qseecom_uvirt_to_kvirt(data,
-			(uintptr_t)req->req_ptr);
+						(uintptr_t)req->req_ptr);
 	req->resp_ptr = (void *)__qseecom_uvirt_to_kvirt(data,
-			(uintptr_t)req->resp_ptr);
+						(uintptr_t)req->resp_ptr);
 
 	if ((cmd_id == QSEOS_TEE_OPEN_SESSION) ||
 			(cmd_id == QSEOS_TEE_REQUEST_CANCELLATION)) {
@@ -6495,10 +6498,10 @@ static int __qseecom_qteec_issue_cmd(struct qseecom_dev_handle *data,
 	} else {
 		ireq_64bit.app_id = data->client.app_id;
 		ireq_64bit.req_ptr = (uint64_t)__qseecom_uvirt_to_kphys(data,
-							(uintptr_t)req_ptr);
+						(uintptr_t)req_ptr);
 		ireq_64bit.req_len = req->req_len;
 		ireq_64bit.resp_ptr = (uint64_t)__qseecom_uvirt_to_kphys(data,
-							(uintptr_t)resp_ptr);
+						(uintptr_t)resp_ptr);
 		ireq_64bit.resp_len = req->resp_len;
 		if ((data->client.app_arch == ELFCLASS32) &&
 			((ireq_64bit.req_ptr >=
@@ -6795,7 +6798,7 @@ static void __qseecom_clean_data_sglistinfo(struct qseecom_dev_handle *data)
 
 
 static int __qseecom_bus_scaling_enable(struct qseecom_dev_handle *data,
-		bool *perf_enabled)
+					bool *perf_enabled)
 {
 	int ret = 0;
 
@@ -6803,19 +6806,25 @@ static int __qseecom_bus_scaling_enable(struct qseecom_dev_handle *data,
 		if (!data->mode) {
 			mutex_lock(&qsee_bw_mutex);
 			__qseecom_register_bus_bandwidth_needs(
-					data, HIGH);
+							data, HIGH);
 			mutex_unlock(&qsee_bw_mutex);
 		}
 		ret = qseecom_scale_bus_bandwidth_timer(INACTIVE);
 		if (ret) {
-			pr_err("Failed to set bw.\n");
+			pr_err("Failed to set bw\n");
 			ret = -EINVAL;
 			goto exit;
 		}
 	}
+	/*
+	* On targets where crypto clock is handled by HLOS,
+	* if clk_access_cnt is zero and perf_enabled is false,
+	* then the crypto clock was not enabled before sending cmd
+	* to tz, qseecom will enable the clock to avoid service failure.
+	*/
 	if (!qseecom.no_clock_support &&
-			!qseecom.qsee.clk_access_cnt && !data->perf_enabled) {
-		pr_debug("ce clock is not enabled!\n");
+		!qseecom.qsee.clk_access_cnt && !data->perf_enabled) {
+		pr_debug("ce clock is not enabled\n");
 		ret = qseecom_perf_enable(data);
 		if (ret) {
 			pr_err("Failed to vote for clock with err %d\n",
@@ -6830,7 +6839,7 @@ exit:
 }
 
 static void __qseecom_bus_scaling_disable(struct qseecom_dev_handle *data,
-		bool perf_enabled)
+					bool perf_enabled)
 {
 	if (qseecom.support_bus_scaling)
 		__qseecom_add_bw_scale_down_timer(
@@ -6908,10 +6917,10 @@ long qseecom_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 		/* Only one client allowed here at a time */
 		mutex_lock(&app_access_lock);
 		ret = __qseecom_bus_scaling_enable(data, &perf_enabled);
-			if (ret) {
-				mutex_unlock(&app_access_lock);
-				break;
-			}
+		if (ret) {
+			mutex_unlock(&app_access_lock);
+			break;
+		}
 		atomic_inc(&data->ioctl_count);
 		ret = qseecom_send_cmd(data, argp);
 		__qseecom_bus_scaling_disable(data, perf_enabled);
@@ -6934,10 +6943,10 @@ long qseecom_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 		/* Only one client allowed here at a time */
 		mutex_lock(&app_access_lock);
 		ret = __qseecom_bus_scaling_enable(data, &perf_enabled);
-			if (ret) {
-				mutex_unlock(&app_access_lock);
-				break;
-			}
+		if (ret) {
+			mutex_unlock(&app_access_lock);
+			break;
+		}
 		atomic_inc(&data->ioctl_count);
 		if (cmd == QSEECOM_IOCTL_SEND_MODFD_CMD_REQ)
 			ret = qseecom_send_modfd_cmd(data, argp);

@@ -2936,7 +2936,7 @@ static inline void qce_free_req_info(struct qce_device *pce_dev, int req_info,
 {
 	pce_dev->ce_request_info[req_info].xfer_type = QCE_XFER_TYPE_LAST;
 	if (atomic_xchg(&pce_dev->ce_request_info[req_info].in_use,
-			false) == true) {
+						false) == true) {
 		if (req_info < MAX_QCE_BAM_REQ && is_complete)
 			atomic_dec(&pce_dev->no_of_queued_req);
 	} else

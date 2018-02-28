@@ -1126,6 +1126,7 @@ static void mdss_rotator_release_from_work_distribution(
 		bool free_perf = false;
 		u32 wb_idx = entry->queue->hw->wb_id;
 
+		mutex_lock(&mgr->lock);
 		mutex_lock(&entry->perf->work_dis_lock);
 		if (entry->perf->work_distribution[wb_idx])
 			entry->perf->work_distribution[wb_idx]--;
@@ -1149,6 +1150,7 @@ static void mdss_rotator_release_from_work_distribution(
 			mdss_rotator_clk_ctrl(mgr, false);
 			entry->perf = NULL;
 		}
+		mutex_unlock(&mgr->lock);
 	}
 }
 
@@ -2045,7 +2047,6 @@ static int mdss_rotator_close_session(struct mdss_rot_mgr *mgr,
 	list_del_init(&perf->list);
 	mutex_unlock(&perf->work_dis_lock);
 	mutex_unlock(&private->perf_lock);
-	mutex_unlock(&mgr->lock);
 
 	if (offload_release_work)
 		goto done;
@@ -2058,6 +2059,7 @@ static int mdss_rotator_close_session(struct mdss_rot_mgr *mgr,
 done:
 	pr_debug("Closed session id:%u", id);
 	ATRACE_END(__func__);
+	mutex_unlock(&mgr->lock);
 	return 0;
 }
 
@@ -2120,6 +2122,10 @@ struct mdss_rot_entry_container *mdss_rotator_req_init(
 	struct mdss_rot_entry_container *req;
 	int size, i;
 
+	/*
+	 * Check input and output plane_count from each given item
+	 * are within the MAX_PLANES limit
+	 */
 	for (i = 0 ; i < count; i++) {
 		if ((items[i].input.plane_count > MAX_PLANES) ||
 				(items[i].output.plane_count > MAX_PLANES)) {
@@ -2183,6 +2189,12 @@ static int mdss_rotator_handle_request(struct mdss_rot_mgr *mgr,
 	struct mdss_rot_entry_container *req = NULL;
 	int size, ret;
 	uint32_t req_count;
+	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
+
+	if (mdata->handoff_pending) {
+		pr_err("Rotator request failed. Handoff pending\n");
+		return -EPERM;
+	}
 
 	if (mdss_get_sd_client_cnt()) {
 		pr_err("rot request not permitted during secure display session\n");

@@ -586,7 +586,7 @@ static ssize_t  msm_bus_dbg_update_request_write(struct file *file,
 					MSM_BUS_DBG("Index conversion"
 						" failed\n");
 					rt_mutex_unlock(
-							&msm_bus_dbg_cllist_lock);
+						&msm_bus_dbg_cllist_lock);
 					res = -EFAULT;
 					goto out;
 				}
@@ -782,6 +782,7 @@ static ssize_t msm_bus_dbg_dump_clients_read(struct file *file,
 		"\nDumping curent client votes to trace log\n");
 	if (*ppos)
 		goto exit_dump_clients_read;
+
 	rt_mutex_lock(&msm_bus_dbg_cllist_lock);
 	list_for_each_entry(cldata, &cl_list, list) {
 		if (IS_ERR_OR_NULL(cldata->pdata))
@@ -976,12 +977,14 @@ static void __exit msm_bus_dbg_teardown(void)
 	struct msm_bus_cldata *cldata = NULL, *cldata_temp;
 
 	debugfs_remove_recursive(dir);
+
 	rt_mutex_lock(&msm_bus_dbg_cllist_lock);
 	list_for_each_entry_safe(cldata, cldata_temp, &cl_list, list) {
 		list_del(&cldata->list);
 		kfree(cldata);
 	}
 	rt_mutex_unlock(&msm_bus_dbg_cllist_lock);
+
 	mutex_lock(&msm_bus_dbg_fablist_lock);
 	list_for_each_entry_safe(fablist, fablist_temp, &fabdata_list, list) {
 		list_del(&fablist->list);

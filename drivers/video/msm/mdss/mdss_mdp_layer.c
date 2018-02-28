@@ -2163,6 +2163,7 @@ int mdss_mdp_layer_pre_commit_wfd(struct msm_fb_data_type *mfd,
 					output_layer->buffer.plane_count);
 			return -EINVAL;
 		}
+
 		data = mdss_mdp_wfd_add_data(wfd, output_layer);
 		if (IS_ERR_OR_NULL(data))
 			return PTR_ERR(data);
@@ -2193,6 +2194,7 @@ int mdss_mdp_layer_pre_commit_wfd(struct msm_fb_data_type *mfd,
 		sync_pt_data = &mfd->mdp_sync_pt_data;
 		mutex_lock(&sync_pt_data->sync_mutex);
 		count = sync_pt_data->acq_fen_cnt;
+
 		if (count >= MDP_MAX_FENCE_FD) {
 			pr_err("Reached maximum possible value for fence count\n");
 			mutex_unlock(&sync_pt_data->sync_mutex);

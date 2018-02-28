@@ -1304,6 +1304,9 @@ rndis_qc_bind_config_vendor(struct usb_configuration *c, u8 ethaddr[ETH_ALEN],
 			rndis_ipa_cleanup(rndis_ipa_params.private);
 		goto fail;
 	}
+
+	_rndis_qc = rndis;
+
 	c->cdev->gadget->bam2bam_func_enabled = true;
 
 	_rndis_qc = rndis;

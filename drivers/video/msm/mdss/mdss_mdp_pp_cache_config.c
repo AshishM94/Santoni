@@ -186,8 +186,8 @@ static int pp_hist_lut_cache_params_pipe_v1_7(struct mdp_hist_lut_data *config,
 	}
 
 	if (copy_from_user(&hist_lut_usr_config,
-			(void __user *) config->cfg_payload,
-			sizeof(hist_lut_usr_config))) {
+				(void __user *) config->cfg_payload,
+				sizeof(hist_lut_usr_config))) {
 		pr_err("failed to copy hist lut config\n");
 		return -EFAULT;
 	}
@@ -602,8 +602,8 @@ static int pp_pcc_cache_params_pipe_v1_7(struct mdp_pcc_cfg_data *config,
 	}
 
 	if (copy_from_user(&v17_usr_config,
-			(void __user *) config->cfg_payload,
-			sizeof(v17_usr_config))) {
+				(void __user *) config->cfg_payload,
+				sizeof(v17_usr_config))) {
 		pr_err("failed to copy pcc config\n");
 		return -EFAULT;
 	}
@@ -861,9 +861,9 @@ static int pp_igc_lut_cache_params_pipe_v1_7(struct mdp_igc_lut_data *config,
 	}
 
 	if (copy_from_user(&v17_usr_config,
-			(void __user *) config->cfg_payload,
-			sizeof(v17_usr_config))) {
-		pr_err("failed to copy igc usr config\n");
+				(void __user *) config->cfg_payload,
+				sizeof(v17_usr_config))) {
+		pr_err("failed to copy igc config\n");
 		return -EFAULT;
 	}
 
@@ -1261,8 +1261,8 @@ static int pp_pa_cache_params_pipe_v1_7(struct mdp_pa_v2_cfg_data *config,
 	}
 
 	if (copy_from_user(&pa_usr_config,
-			(void __user *) config->cfg_payload,
-			sizeof(pa_usr_config))) {
+				(void __user *) config->cfg_payload,
+				sizeof(pa_usr_config))) {
 		pr_err("failed to copy pa usr config\n");
 		return -EFAULT;
 	}

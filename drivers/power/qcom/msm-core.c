@@ -240,10 +240,10 @@ void trigger_cpu_pwr_stats_calc(void)
 		if (cpu_node->sensor_id < 0)
 			continue;
 
-		if (cpu_node->temp == prev_temp[cpu])
+		if (cpu_node->temp == prev_temp[cpu]) {
 			sensor_get_temp(cpu_node->sensor_id, &temp);
-
-		cpu_node->temp = temp / scaling_factor;
+			cpu_node->temp = temp / scaling_factor;
+		}
 
 		prev_temp[cpu] = cpu_node->temp;
 
@@ -373,7 +373,7 @@ static int update_userspace_power(struct sched_params __user *argp)
 {
 	int i;
 	int ret;
-	int cpu;
+	int cpu = -1;
 	struct cpu_activity_info *node;
 	struct cpu_static_info *sp, *clear_sp;
 	int cpumask, cluster, mpidr;
@@ -396,7 +396,7 @@ static int update_userspace_power(struct sched_params __user *argp)
 		}
 	}
 
-	if (cpu >= num_possible_cpus())
+	if ((cpu < 0) || (cpu >= num_possible_cpus()))
 		return -EINVAL;
 
 	node = &activity[cpu];
@@ -407,9 +407,10 @@ static int update_userspace_power(struct sched_params __user *argp)
 	if (!sp)
 		return -ENOMEM;
 
-
+	mutex_lock(&policy_update_mutex);
 	sp->power = allocate_2d_array_uint32_t(node->sp->num_of_freqs);
 	if (IS_ERR_OR_NULL(sp->power)) {
+		mutex_unlock(&policy_update_mutex);
 		ret = PTR_ERR(sp->power);
 		kfree(sp);
 		return ret;
@@ -453,9 +454,10 @@ static int update_userspace_power(struct sched_params __user *argp)
 		}
 	}
 	spin_unlock(&update_lock);
+	mutex_unlock(&policy_update_mutex);
 
 	for_each_possible_cpu(cpu) {
-		if (pdata_valid[cpu])
+		if (!pdata_valid[cpu])
 			continue;
 
 		blocking_notifier_call_chain(
@@ -466,6 +468,7 @@ static int update_userspace_power(struct sched_params __user *argp)
 	return 0;
 
 failed:
+	mutex_unlock(&policy_update_mutex);
 	for (i = 0; i < TEMP_DATA_POINTS; i++)
 		kfree(sp->power[i]);
 	kfree(sp->power);
