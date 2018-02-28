@@ -36,6 +36,9 @@
 #include <sound/initval.h>
 #include <linux/kmod.h>
 
+/* internal flags */
+#define SNDRV_TIMER_IFLG_PAUSED		0x00010000
+
 #if IS_ENABLED(CONFIG_SND_HRTIMER)
 #define DEFAULT_TIMER_LIMIT 4
 #elif IS_ENABLED(CONFIG_SND_RTCTIMER)
@@ -297,8 +300,21 @@ int snd_timer_open(struct snd_timer_instance **ti,
 		get_device(&timer->card->card_dev);
 	timeri->slave_class = tid->dev_sclass;
 	timeri->slave_id = slave_id;
-	if (list_empty(&timer->open_list_head) && timer->hw.open)
-		timer->hw.open(timer);
+
+	if (list_empty(&timer->open_list_head) && timer->hw.open) {
+		int err = timer->hw.open(timer);
+		if (err) {
+			kfree(timeri->owner);
+			kfree(timeri);
+
+			if (timer->card)
+				put_device(&timer->card->card_dev);
+			module_put(timer->module);
+			mutex_unlock(&register_mutex);
+			return err;
+		}
+	}
+
 	list_add_tail(&timeri->open_list, &timer->open_list_head);
 	snd_timer_check_master(timeri);
 	mutex_unlock(&register_mutex);
@@ -422,8 +438,9 @@ static void snd_timer_notify1(struct snd_timer_instance *ti, int event)
 			ts->ccallback(ts, event + 100, &tstamp, resolution);
 }
 
+/* start/continue a master timer */
 static int snd_timer_start1(struct snd_timer_instance *timeri,
-		bool start, unsigned long ticks)
+			    bool start, unsigned long ticks)
 {
 	struct snd_timer *timer;
 	int result;
@@ -439,7 +456,7 @@ static int snd_timer_start1(struct snd_timer_instance *timeri,
 		goto unlock;
 	}
 	if (timeri->flags & (SNDRV_TIMER_IFLG_RUNNING |
-			SNDRV_TIMER_IFLG_START)) {
+			     SNDRV_TIMER_IFLG_START)) {
 		result = -EBUSY;
 		goto unlock;
 	}
@@ -473,8 +490,9 @@ static int snd_timer_start1(struct snd_timer_instance *timeri,
 	return result;
 }
 
+/* start/continue a slave timer */
 static int snd_timer_start_slave(struct snd_timer_instance *timeri,
-		bool start)
+				 bool start)
 {
 	unsigned long flags;
 
@@ -496,6 +514,7 @@ static int snd_timer_start_slave(struct snd_timer_instance *timeri,
 	return 1; /* delayed start */
 }
 
+/* stop/pause a master timer */
 static int snd_timer_stop1(struct snd_timer_instance *timeri, bool stop)
 {
 	struct snd_timer *timer;
@@ -532,6 +551,10 @@ static int snd_timer_stop1(struct snd_timer_instance *timeri, bool stop)
 		}
 	}
 	timeri->flags &= ~(SNDRV_TIMER_IFLG_RUNNING | SNDRV_TIMER_IFLG_START);
+	if (stop)
+		timeri->flags &= ~SNDRV_TIMER_IFLG_PAUSED;
+	else
+		timeri->flags |= SNDRV_TIMER_IFLG_PAUSED;
 	snd_timer_notify1(timeri, stop ? SNDRV_TIMER_EVENT_STOP :
 			  SNDRV_TIMER_EVENT_CONTINUE);
  unlock:
@@ -539,6 +562,7 @@ static int snd_timer_stop1(struct snd_timer_instance *timeri, bool stop)
 	return result;
 }
 
+/* stop/pause a slave timer */
 static int snd_timer_stop_slave(struct snd_timer_instance *timeri, bool stop)
 {
 	unsigned long flags;
@@ -554,7 +578,7 @@ static int snd_timer_stop_slave(struct snd_timer_instance *timeri, bool stop)
 		list_del_init(&timeri->ack_list);
 		list_del_init(&timeri->active_list);
 		snd_timer_notify1(timeri, stop ? SNDRV_TIMER_EVENT_STOP :
-				SNDRV_TIMER_EVENT_CONTINUE);
+				  SNDRV_TIMER_EVENT_CONTINUE);
 		spin_unlock(&timeri->timer->lock);
 	}
 	spin_unlock_irqrestore(&slave_active_lock, flags);
@@ -574,6 +598,12 @@ int snd_timer_start(struct snd_timer_instance *timeri, unsigned int ticks)
 		return snd_timer_start1(timeri, true, ticks);
 }
 
+/*
+ * stop the timer instance.
+ *
+ * do not call this from the timer callback!
+ */
+
 int snd_timer_stop(struct snd_timer_instance *timeri)
 {
 	if (timeri->flags & SNDRV_TIMER_IFLG_SLAVE)
@@ -587,6 +617,10 @@ int snd_timer_stop(struct snd_timer_instance *timeri)
  */
 int snd_timer_continue(struct snd_timer_instance *timeri)
 {
+	/* timer can continue only after pause */
+	if (!(timeri->flags & SNDRV_TIMER_IFLG_PAUSED))
+		return -EINVAL;
+
 	if (timeri->flags & SNDRV_TIMER_IFLG_SLAVE)
 		return snd_timer_start_slave(timeri, false);
 	else
@@ -815,6 +849,7 @@ int snd_timer_new(struct snd_card *card, char *id, struct snd_timer_id *tid,
 	timer->tmr_subdevice = tid->subdevice;
 	if (id)
 		strlcpy(timer->id, id, sizeof(timer->id));
+	timer->sticks = 1;
 	INIT_LIST_HEAD(&timer->device_list);
 	INIT_LIST_HEAD(&timer->open_list_head);
 	INIT_LIST_HEAD(&timer->active_list_head);
@@ -1806,6 +1841,9 @@ static int snd_timer_user_continue(struct file *file)
 	tu = file->private_data;
 	if (!tu->timeri)
 		return -EBADFD;
+	/* start timer instead of continue if it's not used before */
+	if (!(tu->timeri->flags & SNDRV_TIMER_IFLG_PAUSED))
+		return snd_timer_user_start(file);
 	tu->timeri->lost = 0;
 	return (err = snd_timer_continue(tu->timeri)) < 0 ? err : 0;
 }
