@@ -647,7 +647,7 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 	uvc_ss_streaming_comp.bmAttributes = 0;
 	uvc_ss_streaming_comp.bMaxBurst = opts->streaming_maxburst;
 	uvc_ss_streaming_comp.wBytesPerInterval =
-		cpu_to_le16(UVC_STREAMING_SS_MAX_PACKET_SIZE * 1 *
+		cpu_to_le16(max_packet_size * max_packet_mult *
 			    (opts->streaming_maxburst + 1));
 
 	/* Allocate endpoints. */
