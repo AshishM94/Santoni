@@ -841,11 +841,19 @@ config CPUMAXFREQ
 	bool "Enable CPUMAXFREQ Proc Interface"
 	help
 	  Provide a interface for getting the maximum frequency supported by cpu core
+
 config QCOM_SMCINVOKE
 	bool "Secure QSEE Support"
 	help
 	  Enable SMCInvoke driver which supports capability based secure
 	  communication between QSEE and HLOS.
+
+config SANTONI_DTB
+        depends on ARCH_MSM
+        default n
+        bool "Santoni DTB"
+        help
+          Only build S88536AA2 DTB to reduce final image size.
 
 source "drivers/soc/qcom/memshare/Kconfig"
 
