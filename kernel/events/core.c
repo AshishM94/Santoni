@@ -7447,9 +7447,13 @@ static void mutex_lock_double(struct mutex *a, struct mutex *b)
 	mutex_lock_nested(b, SINGLE_DEPTH_NESTING);
 }
 
+/*
+ * Variation on perf_event_ctx_lock_nested(), except we take two context
+ * mutexes.
+ */
 static struct perf_event_context *
 __perf_event_ctx_lock_double(struct perf_event *group_leader,
-		struct perf_event_context *ctx)
+			     struct perf_event_context *ctx)
 {
 	struct perf_event_context *gctx;
 
@@ -7704,7 +7708,16 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (move_group) {
 		gctx = __perf_event_ctx_lock_double(group_leader, ctx);
 
+		/*
+		 * Check if we raced against another sys_perf_event_open() call
+		 * moving the software group underneath us.
+		 */
 		if (!(group_leader->group_flags & PERF_GROUP_SOFTWARE)) {
+			/*
+			 * If someone moved the group out from under us, check
+			 * if this new event wound up on the same ctx, if so
+			 * its the regular !move_group case, otherwise fail.
+			 */
 			if (gctx != ctx) {
 				err = -EINVAL;
 				goto err_locked;
