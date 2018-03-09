@@ -1137,4 +1137,7 @@ config TOUCHSCREEN_MAXIM_STI
 
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 
+config WAKE_GESTURES
+	bool "wake gestures"
+
 endif
