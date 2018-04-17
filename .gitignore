@@ -35,6 +35,7 @@
 modules.builtin
 Module.symvers
 *.dwo
+buildlog.txt
 
 #
 # Top-level generic files

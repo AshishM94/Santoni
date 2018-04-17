@@ -1,0 +1,27 @@
+on boot
+
+#S2W
+write /sys/android_touch/sweep2wake  4
+
+#DT2W
+write /sys/android_touch/doubletap2wake  0
+
+#S2S
+write /sys/android_touch/sweep2sleep 3
+
+#load modules
+insmod /system/lib/modules/xpad.ko
+insmod /system/lib/modules/fscache.ko
+insmod /system/lib/modules/cifs.ko
+insmod /system/lib/modules/grace.ko
+insmod /system/lib/modules/ntfs.ko
+insmod /system/lib/modules/sunrpc.ko
+insmod /system/lib/modules/auth_rpcgss.ko
+insmod /system/lib/modules/lockd.ko
+insmod /system/lib/modules/nfs.ko
+insmod /system/lib/modules/nfsv2.ko
+insmod /system/lib/modules/nfsv3.ko
+insmod /system/lib/modules/rpsec_gss_krb5.ko
+insmod /system/lib/modules/nfsv4.ko
+insmod /system/lib/modules/nfs_layout_nfsv41_files.ko
+insmod /system/lib/modules/blocklayoutdriver.ko
