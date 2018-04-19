@@ -36,6 +36,9 @@ modules.builtin
 Module.symvers
 *.dwo
 buildlog.txt
+*.zip
+Image.gz-dtb
+*.zip.sha1
 
 #
 # Top-level generic files
